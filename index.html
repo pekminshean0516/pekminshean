@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>答题比赛</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #e0f7fa, #ffffff);
+      padding: 40px 20px;
+      max-width: 700px;
+      margin: auto;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      color: #00796b;
+    }
+    .box {
+      background-color: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin: 10px 0;
+      font-size: 1.1em;
+    }
+    input[type=text] {
+      width: 100%;
+      padding: 10px;
+      font-size: 1em;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .question {
+      font-size: 1.3em;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+    .options label {
+      display: block;
+      background: #f0f0f0;
+      margin: 8px 0;
+      padding: 10px 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .options input[type=radio] {
+      margin-right: 10px;
+    }
+    .options label:hover {
+      background: #dcedc8;
+    }
+    button {
+      display: block;
+      width: 100%;
+      background-color: #00796b;
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 1em;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-top: 15px;
+    }
+    button:hover:not(:disabled) {
+      background-color: #004d40;
+    }
+    button:disabled {
+      background-color: #b2dfdb;
+      cursor: not-allowed;
+    }
+    .progress-container {
+      width: 100%;
+      height: 12px;
+      background: #eee;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 15px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #00796b;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .timer {
+      text-align: right;
+      font-weight: bold;
+      color: #d32f2f;
+      margin-bottom: 10px;
+    }
+    .result-message {
+      text-align: center;
+      font-size: 1.2em;
+      color: #388e3c;
+    }
+  </style>
+</head>
+<body>
+  <h1>答题比赛</h1>
+  <div id="start" class="box">
+    <label for="studentId">请输入学号：</label>
+    <input type="text" id="studentId" placeholder="如：20231234" required />
+    <button id="startBtn">开始答题</button>
+  </div>
+
+  <div class="timer" id="timer" style="display:none;">剩余时间：15:00</div>
+  <div class="progress-container" id="progressContainer" style="display:none;">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+  <div id="quiz" class="box" style="display:none;"></div>
+  <button id="nextBtn" style="display:none;" disabled>下一题</button>
+
+  <script>
+    const allQuestions = [
+      { q: "1 + 1 = ?", options: ["1", "2", "3", "4"], answer: 1 },
+      { q: "2 + 3 = ?", options: ["4", "5", "6", "7"], answer: 1 },
+      { q: "5 - 2 = ?", options: ["1", "2", "3", "4"], answer: 2 },
+      { q: "10 ÷ 2 = ?", options: ["3", "4", "5", "6"], answer: 2 },
+      { q: "3 x 3 = ?", options: ["6", "7", "8", "9"], answer: 3 },
+      // 添加更多题目以达到 50 题
+    ];
+    const questions = allQuestions.sort(() => Math.random() - 0.5).slice(0, 50);
+    let current = 0;
+    let score = 0;
+    let selected = null;
+    let studentId = "";
+    let timerInterval;
+
+    const quizDiv = document.getElementById('quiz');
+    const nextBtn = document.getElementById('nextBtn');
+    const startDiv = document.getElementById('start');
+    const startBtn = document.getElementById('startBtn');
+    const timerDiv = document.getElementById('timer');
+    const progressBar = document.getElementById('progressBar');
+    const progressContainer = document.getElementById('progressContainer');
+
+    function startTimer(duration) {
+      let timeLeft = duration;
+      function updateDisplay() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerDiv.textContent = `剩余时间：${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      updateDisplay();
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateDisplay();
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          autoSubmit();
+        }
+      }, 1000);
+    }
+
+    startBtn.addEventListener('click', () => {
+      const input = document.getElementById('studentId').value.trim();
+      if (!input) {
+        alert("请填写学号！");
+        return;
+      }
+      studentId = input;
+      startDiv.style.display = 'none';
+      quizDiv.style.display = 'block';
+      nextBtn.style.display = 'block';
+      timerDiv.style.display = 'block';
+      progressContainer.style.display = 'block';
+      showQuestion(current);
+      startTimer(1 * 60); // 15 分钟
+    });
+
+    function updateProgress() {
+      const percentage = Math.round((current / questions.length) * 100);
+      progressBar.style.width = `${percentage}%`;
+    }
+
+    function showQuestion(index) {
+      selected = null;
+      nextBtn.disabled = true;
+      updateProgress();
+      const q = questions[index];
+      quizDiv.innerHTML = `<div class="question">题目 ${index + 1}：${q.q}</div>`;
+      const opts = q.options.map((opt, i) => `
+        <label><input type="radio" name="opt" value="${i}"> ${opt}</label>
+      `).join('');
+      quizDiv.innerHTML += `<div class="options">${opts}</div>`;
+      document.querySelectorAll('input[name=opt]').forEach(input => {
+        input.addEventListener('change', e => {
+          selected = parseInt(e.target.value);
+          nextBtn.disabled = false;
+        });
+      });
+    }
+
+    function finishQuiz() {
+      quizDiv.innerHTML = "<div class='result-message'><h2>谢谢参与！</h2><p>您的答题记录已提交。</p></div>";
+      nextBtn.style.display = 'none';
+      timerDiv.style.display = 'none';
+      progressContainer.style.display = 'none';
+
+      fetch("https://docs.google.com/forms/u/0/d/e/1FAIpQLSc8J-wisxc5kKWhq0SCbsSy6frp4TozdAVSzuLb4HR6q6wkWg/formResponse", {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          "entry.1661960501": score,               // 分数字段
+          "entry.353498214": studentId       // 学号字段，请替换
+        })
+      });
+    }
+
+    function autoSubmit() {
+      alert("时间到，系统将自动提交！");
+      finishQuiz();
+    }
+
+    nextBtn.addEventListener('click', () => {
+      if (selected === questions[current].answer) score++;
+      current++;
+      if (current < questions.length) {
+        showQuestion(current);
+      } else {
+        clearInterval(timerInterval);
+        finishQuiz();
+      }
+    });
+  </script>
+</body>
+</html>
